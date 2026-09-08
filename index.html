@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Planner</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <main class="page-shell">
+    <header class="page-header">
+      <div>
+        <p class="eyebrow">Personal planning canvas</p>
+        <h1>Planner</h1>
+      </div>
+      <p class="instruction">Select a highlight below, then drag across dates to paint it</p>
+    </header>
+
+    <section class="toolbar panel" aria-label="Calendar controls">
+      <div class="date-controls control-group">
+        <button class="icon-button" id="previous-week" aria-label="Previous week">‹</button>
+        <input id="start-date" type="date" aria-label="Calendar start date" />
+        <button class="icon-button" id="next-week" aria-label="Next week">›</button>
+      </div>
+      <span class="separator"></span>
+      <div class="week-controls control-group">
+        <span class="control-label">Show</span>
+        <button class="small-button" id="decrease-weeks" aria-label="Show fewer weeks">−</button>
+        <strong id="weeks-label">6 weeks</strong>
+        <button class="small-button" id="increase-weeks" aria-label="Show more weeks">+</button>
+      </div>
+      <span class="separator"></span>
+      <div class="presets" id="presets" aria-label="Week presets"></div>
+    </section>
+
+    <section class="panel highlights-panel">
+      <span class="section-label">Highlights</span>
+      <div class="highlight-row">
+        <div id="highlight-list" class="highlight-list"></div>
+        <button id="eraser" class="pill-button">Eraser</button>
+      </div>
+      <form id="new-highlight" class="new-highlight">
+        <div class="emoji-picker-wrap">
+          <button id="emoji-trigger" class="emoji-trigger" type="button" aria-label="Choose an emoji">🎯</button>
+          <emoji-picker id="emoji-picker"></emoji-picker>
+          <input id="emoji-input" type="hidden" value="🎯" />
+        </div>
+        <input id="title-input" class="title-input" placeholder="Label, e.g. Vacation" aria-label="Highlight label" />
+        <div id="swatches" class="swatches" aria-label="Highlight color"></div>
+        <button class="add-button" type="submit">Add</button>
+      </form>
+    </section>
+
+    <section id="calendar" class="calendar panel" aria-label="Planner calendar"></section>
+    <p class="save-status" id="save-status" aria-live="polite">Saved in this browser</p>
+  </main>
+  <script src="app.js"></script>
+  <script type="module" src="https://cdn.jsdelivr.net/npm/emoji-picker-element@^1/index.js"></script>
+</body>
+</html>
