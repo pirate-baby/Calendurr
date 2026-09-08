@@ -19,6 +19,11 @@ const state = {
   draftHue: HUES[0], ...(saved || {})
 };
 state.startDate = new Date(state.startDate);
+state.weather = { zip: '', highs: {}, lows: {}, rain: {}, temperatureMode: 'high', location: '', status: '', ...(state.weather || {}) };
+state.weather.highs ||= {};
+state.weather.lows ||= {};
+state.weather.rain ||= {};
+if (!['high', 'low'].includes(state.weather.temperatureMode)) state.weather.temperatureMode = 'high';
 let dragStart = null;
 let dragEnd = null;
 let dragging = false;
@@ -36,6 +41,85 @@ function changeStart(days) { state.startDate.setDate(state.startDate.getDate() +
 function setWeeks(weeks) { state.weeks = Math.max(2, Math.min(16, weeks)); render(); persist(); }
 function cellKey(index) { const date = new Date(state.startDate); date.setDate(date.getDate() + index); return dateKey(date); }
 function getHighlight(id) { return state.highlights.find(item => item.id === id); }
+function highlightLabel(title) {
+  if (title.length <= 14) return escapeHtml(title);
+  const middle = Math.ceil(title.length / 2);
+  const wordBreak = title.lastIndexOf(' ', middle);
+  const splitAt = wordBreak > 0 ? wordBreak : middle;
+  return `${escapeHtml(title.slice(0, splitAt))}<br>${escapeHtml(title.slice(splitAt).trim())}`;
+}
+function temperatureColor(temperature) { const ratio = Math.max(0, Math.min(1, (temperature + 10) / 120)); return color(225 - ratio * 220, .67, .15); }
+
+function renderWeather() {
+  const weather = state.weather;
+  document.querySelector('#weather-zip').value = weather.zip;
+  document.querySelector('#weather-status').textContent = weather.status || 'Enter a US ZIP code to color days by forecast high.';
+  document.querySelectorAll('[data-temperature-mode]').forEach(button => button.classList.toggle('active', button.dataset.temperatureMode === weather.temperatureMode));
+  const marks = [0, 32, 50, 70, 90, 110];
+  document.querySelector('#temperature-scale').innerHTML = `<div class="temperature-gradient"></div>${marks.map(temperature => `<span class="temperature-mark" style="left:${((temperature + 10) / 120) * 100}%">${temperature}°</span>`).join('')}`;
+}
+
+async function loadWeather(zip) {
+  const normalizedZip = zip.trim();
+  if (!/^\d{5}$/.test(normalizedZip)) {
+    state.weather.status = 'Enter a five-digit US ZIP code.';
+    renderWeather();
+    return;
+  }
+  state.weather = { ...state.weather, zip: normalizedZip, highs: {}, lows: {}, rain: {}, location: '', status: 'Loading NOAA forecast...' };
+  renderWeather();
+  persist();
+  try {
+    const locationResponse = await fetch(`https://api.zippopotam.us/us/${normalizedZip}`);
+    if (!locationResponse.ok) throw new Error('ZIP code not found');
+    const location = await locationResponse.json();
+    const place = location.places?.[0];
+    if (!place) throw new Error('ZIP code not found');
+    const pointResponse = await fetch(`https://api.weather.gov/points/${place.latitude},${place.longitude}`, { headers: { Accept: 'application/geo+json' } });
+    if (!pointResponse.ok) throw new Error('NOAA forecast unavailable');
+    const point = await pointResponse.json();
+    const forecastResponse = await fetch(point.properties.forecast, { headers: { Accept: 'application/geo+json' } });
+    if (!forecastResponse.ok) throw new Error('NOAA forecast unavailable');
+    const forecast = await forecastResponse.json();
+    const highs = {};
+    const lows = {};
+    const rain = {};
+    forecast.properties.periods.forEach(period => {
+      if (typeof period.temperature !== 'number') return;
+      const temperature = period.temperatureUnit === 'C' ? Math.round(period.temperature * 9 / 5 + 32) : period.temperature;
+      const date = period.startTime.slice(0, 10);
+      if (period.isDaytime) {
+        highs[date] = temperature;
+        if ((period.probabilityOfPrecipitation?.value || 0) >= 20) rain[date] = period.probabilityOfPrecipitation.value;
+      } else lows[date] = temperature;
+    });
+    let extended = false;
+    try {
+      const extendedResponse = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${place.latitude}&longitude=${place.longitude}&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max&temperature_unit=fahrenheit&forecast_days=16&timezone=auto`);
+      if (!extendedResponse.ok) throw new Error('Extended forecast unavailable');
+      const extendedForecast = await extendedResponse.json();
+      extendedForecast.daily.time.forEach((date, index) => {
+        const temperature = extendedForecast.daily.temperature_2m_max[index];
+        const low = extendedForecast.daily.temperature_2m_min[index];
+        const precipitation = extendedForecast.daily.precipitation_probability_max[index];
+        if (typeof temperature === 'number' && typeof highs[date] !== 'number') highs[date] = Math.round(temperature);
+        if (typeof low === 'number' && typeof lows[date] !== 'number') lows[date] = Math.round(low);
+        if (typeof precipitation === 'number' && precipitation >= 20 && !rain[date]) rain[date] = precipitation;
+      });
+      extended = true;
+    } catch {
+      // NOAA data remains available when the extended forecast cannot be loaded.
+    }
+    const locationName = `${place['place name']}, ${place['state abbreviation']}`;
+    state.weather = { zip: normalizedZip, highs, lows, rain, temperatureMode: state.weather.temperatureMode, location: locationName, status: `${extended ? 'NOAA + Open-Meteo 16-day' : 'NOAA'} forecast for ${locationName}` };
+    render();
+    persist();
+  } catch (error) {
+    state.weather = { ...state.weather, highs: {}, lows: {}, rain: {}, status: error.message || 'Unable to load NOAA forecast.' };
+    render();
+    persist();
+  }
+}
 
 function renderControls() {
   document.querySelector('#start-date').value = dateKey(state.startDate);
@@ -62,8 +146,13 @@ function renderCalendar() {
     const isHighlightStart = Boolean(item && state.painted[dateKey(previousDate)] !== item.id);
     const isSelected = dragStart !== null && index >= Math.min(dragStart, dragEnd) && index <= Math.max(dragStart, dragEnd);
     const label = (date.getDate() === 1 || index === 0) ? MONTHS[date.getMonth()] : '';
-    const marker = isHighlightStart ? `<span class="highlight-band" style="--band-color:${color(item.hue, .62)}"><span>${escapeHtml(item.title)}</span></span><span class="highlight-emoji">${item.emoji}</span>` : '';
-    html += `<div class="day ${item ? 'highlighted' : ''} ${isSelected ? 'selected' : ''}" data-index="${index}" style="--day-color:${item ? color(item.hue, .93, .045) : '#fff'}">${marker}<div class="day-top"><span class="month-label">${label}</span><span class="day-number ${key === today ? 'today' : ''}">${date.getDate()}</span></div><div class="day-note" contenteditable="true" data-note="${key}">${escapeHtml(state.notes[key] || '')}</div></div>`;
+    const marker = isHighlightStart ? `<span class="highlight-band ${item.title.length > 14 ? 'wide' : ''}" style="--band-color:${color(item.hue, .62)}"><span>${highlightLabel(item.title)}</span></span><span class="highlight-emoji">${item.emoji}</span>` : '';
+    const temperature = state.weather[state.weather.temperatureMode === 'low' ? 'lows' : 'highs'][key];
+    const precipitation = state.weather.rain[key];
+    const weatherStyle = typeof temperature === 'number' ? `--temp-color:${temperatureColor(temperature)}` : '';
+    const weatherTitle = typeof temperature === 'number' ? ` title="Forecast ${state.weather.temperatureMode}: ${temperature} F"` : '';
+    const rainEmoji = precipitation ? `<span class="weather-rain" title="${precipitation}% chance of precipitation">🌧️</span>` : '';
+    html += `<div class="day ${item ? 'highlighted' : ''} ${isSelected ? 'selected' : ''} ${typeof temperature === 'number' ? 'has-temperature' : ''}" data-index="${index}" style="--day-color:${item ? color(item.hue, .93, .045) : '#fff'};${weatherStyle}"${weatherTitle}>${marker}<div class="day-top"><span class="month-label">${label}</span><span class="date-weather">${rainEmoji}<span class="day-number ${key === today ? 'today' : ''}">${date.getDate()}</span></span></div><div class="day-note" contenteditable="true" data-note="${key}">${escapeHtml(state.notes[key] || '')}</div></div>`;
   }
   calendar.innerHTML = html;
   const startPaint = (event, pointerId) => {
@@ -142,13 +231,15 @@ function cancelPaint(event) {
   renderCalendar();
 }
 function escapeHtml(value) { return String(value).replace(/[&<>'"]/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[character])); }
-function render() { renderControls(); renderCalendar(); }
+function render() { renderControls(); renderWeather(); renderCalendar(); }
 
 document.querySelector('#previous-week').onclick = () => changeStart(-7);
 document.querySelector('#next-week').onclick = () => changeStart(7);
 document.querySelector('#decrease-weeks').onclick = () => setWeeks(state.weeks - 1);
 document.querySelector('#increase-weeks').onclick = () => setWeeks(state.weeks + 1);
 document.querySelector('#start-date').onchange = event => { if (event.target.value) { state.startDate = sundayOf(parseDate(event.target.value)); render(); persist(); } };
+document.querySelector('#weather-form').onsubmit = event => { event.preventDefault(); loadWeather(document.querySelector('#weather-zip').value); };
+document.querySelectorAll('[data-temperature-mode]').forEach(button => button.onclick = () => { state.weather.temperatureMode = button.dataset.temperatureMode; render(); persist(); });
 document.querySelector('#new-highlight').onsubmit = event => { event.preventDefault(); const title = document.querySelector('#title-input').value.trim(); if (!title) return; const id = `highlight-${Date.now()}`; state.highlights.push({ id, title, emoji: document.querySelector('#emoji-input').value.trim() || '📌', hue: state.draftHue }); state.active = id; document.querySelector('#title-input').value = ''; state.draftHue = HUES[(HUES.indexOf(state.draftHue) + 1) % HUES.length]; render(); persist(); };
 const emojiTrigger = document.querySelector('#emoji-trigger');
 const emojiPicker = document.querySelector('#emoji-picker');

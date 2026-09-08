@@ -33,6 +33,25 @@
       <div class="presets" id="presets" aria-label="Week presets"></div>
     </section>
 
+    <section class="weather-panel panel" aria-label="NOAA weather forecast">
+      <div class="weather-heading">
+        <div>
+          <p class="section-label">NOAA Forecast</p>
+          <p id="weather-status" class="weather-status" aria-live="polite">Enter a US ZIP code to color days by forecast high.</p>
+          <div class="temperature-mode" aria-label="Calendar temperature band">
+            <button type="button" data-temperature-mode="high">Highs</button>
+            <button type="button" data-temperature-mode="low">Lows</button>
+          </div>
+        </div>
+        <form id="weather-form" class="weather-form">
+          <label for="weather-zip">ZIP code</label>
+          <input id="weather-zip" inputmode="numeric" autocomplete="postal-code" maxlength="5" pattern="[0-9]{5}" placeholder="02139" aria-label="US ZIP code" />
+          <button class="weather-button" type="submit">Load weather</button>
+        </form>
+      </div>
+      <div id="temperature-scale" class="temperature-scale" aria-label="Temperature color scale"></div>
+    </section>
+
     <section class="panel highlights-panel">
       <span class="section-label">Highlights</span>
       <div class="highlight-row">
