@@ -10,10 +10,8 @@
   <main class="page-shell">
     <header class="page-header">
       <div>
-        <p class="eyebrow">Personal planning canvas</p>
-        <h1>Planner</h1>
+        <h1>Calendurr</h1>
       </div>
-      <p class="instruction">Select a highlight below, then drag across dates to paint it</p>
     </header>
 
     <section class="toolbar panel" aria-label="Calendar controls">
@@ -29,7 +27,6 @@
         <strong id="weeks-label">6 weeks</strong>
         <button class="small-button" id="increase-weeks" aria-label="Show more weeks">+</button>
       </div>
-      <span class="separator"></span>
       <div class="presets" id="presets" aria-label="Week presets"></div>
     </section>
 
@@ -52,27 +49,37 @@
       <div id="temperature-scale" class="temperature-scale" aria-label="Temperature color scale"></div>
     </section>
 
-    <section class="panel highlights-panel">
-      <span class="section-label">Highlights</span>
-      <div class="highlight-row">
-        <div id="highlight-list" class="highlight-list"></div>
+    <section class="panel contexts-panel">
+      <span class="section-label">Contexts</span>
+      <div class="context-row">
+        <div id="context-list" class="context-list"></div>
         <button id="eraser" class="pill-button">Eraser</button>
       </div>
-      <form id="new-highlight" class="new-highlight">
+      <form id="new-context" class="new-context">
         <div class="emoji-picker-wrap">
           <button id="emoji-trigger" class="emoji-trigger" type="button" aria-label="Choose an emoji">🎯</button>
           <emoji-picker id="emoji-picker"></emoji-picker>
           <input id="emoji-input" type="hidden" value="🎯" />
         </div>
-        <input id="title-input" class="title-input" placeholder="Label, e.g. Vacation" aria-label="Highlight label" />
-        <div id="swatches" class="swatches" aria-label="Highlight color"></div>
+        <input id="title-input" class="title-input" placeholder="Context, e.g. Grandma in town" aria-label="Context name" />
+        <div id="swatches" class="swatches" aria-label="Context color"></div>
         <button class="add-button" type="submit">Add</button>
       </form>
     </section>
 
+    <div class="calendar-heading">
+      <div class="mode-controls" aria-label="Calendar mode">
+        <button id="task-mode" class="mode-button" type="button" title="Task mode" aria-label="Task mode">☑️</button>
+        <button id="context-mode" class="mode-button" type="button" title="Context mode" aria-label="Context mode">🖍️</button>
+      </div>
+    </div>
     <section id="calendar" class="calendar panel" aria-label="Planner calendar"></section>
-    <p class="save-status" id="save-status" aria-live="polite">Saved in this browser</p>
   </main>
+
+  <aside id="task-panel" class="task-panel" aria-label="Tasks" aria-hidden="true">
+    <div id="task-panel-content"></div>
+  </aside>
+  <div id="task-panel-scrim" class="task-panel-scrim" hidden></div>
   <script src="app.js"></script>
   <script type="module" src="https://cdn.jsdelivr.net/npm/emoji-picker-element@^1/index.js"></script>
 </body>

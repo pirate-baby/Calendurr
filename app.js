@@ -7,6 +7,10 @@ const dateKey = date => `${date.getFullYear()}-${String(date.getMonth() + 1).pad
 const sundayOf = date => { const result = new Date(date); result.setHours(0, 0, 0, 0); result.setDate(result.getDate() - result.getDay()); return result; };
 const parseDate = value => { const [year, month, day] = value.split('-').map(Number); return new Date(year, month - 1, day); };
 const color = (hue, lightness = .7, chroma = .13) => `oklch(${lightness} ${chroma} ${hue})`;
+const projectHue = project => {
+  if (!project) return 0;
+  return [...project].reduce((total, character) => (total * 31 + character.charCodeAt(0)) % 360, 0);
+};
 
 let saved = null;
 try {
@@ -15,15 +19,25 @@ try {
   saved = null;
 }
 const state = {
-  startDate: sundayOf(new Date()), weeks: 6, notes: {}, highlights: [], painted: {}, emojis: {}, active: null,
-  draftHue: HUES[0], ...(saved || {})
+  startDate: sundayOf(new Date()), weeks: 6, contexts: [], painted: {}, emojis: {}, active: null,
+  draftHue: HUES[0], tasks: [], selectedDate: null, selectedTaskId: null, mode: 'task', ...(saved || {})
 };
 state.startDate = new Date(state.startDate);
+delete state.notes;
+if (!Array.isArray(saved?.contexts)) state.contexts = Array.isArray(state.highlights) ? state.highlights : [];
+delete state.highlights;
 state.weather = { zip: '', highs: {}, lows: {}, rain: {}, temperatureMode: 'high', location: '', status: '', ...(state.weather || {}) };
 state.weather.highs ||= {};
 state.weather.lows ||= {};
 state.weather.rain ||= {};
 if (!['high', 'low'].includes(state.weather.temperatureMode)) state.weather.temperatureMode = 'high';
+if (state.mode === 'highlight') state.mode = 'context';
+if (!['task', 'context'].includes(state.mode)) state.mode = 'task';
+state.tasks = Array.isArray(state.tasks) ? state.tasks.filter(task => task && task.id && task.title && task.date).map(task => ({
+  id: String(task.id), title: String(task.title), description: String(task.description || ''), date: String(task.date),
+  labels: Array.isArray(task.labels) ? task.labels.map(String) : [], project: String(task.project || ''), priorityOrder: Number(task.priorityOrder) || 0,
+  status: String(task.status || 'todo')
+})) : [];
 let dragStart = null;
 let dragEnd = null;
 let dragging = false;
@@ -35,13 +49,15 @@ function persist() {
   } catch {
     // The planner remains usable when browser storage is blocked.
   }
-  document.querySelector('#save-status').textContent = 'Saved in this browser';
 }
 function changeStart(days) { state.startDate.setDate(state.startDate.getDate() + days); render(); persist(); }
 function setWeeks(weeks) { state.weeks = Math.max(2, Math.min(16, weeks)); render(); persist(); }
 function cellKey(index) { const date = new Date(state.startDate); date.setDate(date.getDate() + index); return dateKey(date); }
-function getHighlight(id) { return state.highlights.find(item => item.id === id); }
-function highlightLabel(title) {
+function getContext(id) { return state.contexts.find(item => item.id === id); }
+function tasksForDate(date) { return state.tasks.filter(task => task.date === date).sort((a, b) => a.priorityOrder - b.priorityOrder || a.title.localeCompare(b.title)); }
+function taskColor(task) { return task.project ? color(projectHue(task.project), .62, .13) : '#938b84'; }
+function taskIdLabel(task) { return escapeHtml(task.id.length > 5 ? task.id.slice(-5) : task.id); }
+function contextLabel(title) {
   if (title.length <= 14) return escapeHtml(title);
   const middle = Math.ceil(title.length / 2);
   const wordBreak = title.lastIndexOf(' ', middle);
@@ -126,13 +142,15 @@ function renderControls() {
   document.querySelector('#weeks-label').textContent = `${state.weeks} weeks`;
   document.querySelector('#presets').innerHTML = [4, 6, 8, 12].map(weeks => `<button class="preset ${state.weeks === weeks ? 'active' : ''}" data-weeks="${weeks}">${weeks === 8 ? '8w (2mo)' : `${weeks}w`}</button>`).join('');
   document.querySelector('#presets').querySelectorAll('button').forEach(button => button.onclick = () => setWeeks(Number(button.dataset.weeks)));
+  document.querySelector('#task-mode').classList.toggle('active', state.mode === 'task');
+  document.querySelector('#context-mode').classList.toggle('active', state.mode === 'context');
   document.querySelector('#swatches').innerHTML = HUES.map(hue => `<button type="button" class="swatch ${state.draftHue === hue ? 'selected' : ''}" style="background:${color(hue)}" aria-label="Select color" data-hue="${hue}"></button>`).join('');
   document.querySelectorAll('.swatch').forEach(button => button.onclick = () => { state.draftHue = Number(button.dataset.hue); renderControls(); });
-  const list = document.querySelector('#highlight-list');
-  list.innerHTML = state.highlights.map(item => `<span class="highlight-item"><button class="pill-button ${state.active === item.id ? 'active' : ''}" style="--dot:${color(item.hue, .62)};--soft:${color(item.hue, .93, .045)}" data-tool="${item.id}"><span>${item.emoji}</span><span class="dot"></span>${escapeHtml(item.title)}</button><button class="remove-button" title="Remove ${escapeHtml(item.title)}" data-remove="${item.id}">×</button></span>`).join('');
-  list.querySelectorAll('[data-tool]').forEach(button => button.onclick = () => { state.active = state.active === button.dataset.tool ? null : button.dataset.tool; renderControls(); });
-  list.querySelectorAll('[data-remove]').forEach(button => button.onclick = () => { const id = button.dataset.remove; state.highlights = state.highlights.filter(item => item.id !== id); Object.keys(state.painted).forEach(key => { if (state.painted[key] === id) delete state.painted[key]; }); if (state.active === id) state.active = null; render(); persist(); });
-  const eraser = document.querySelector('#eraser'); eraser.classList.toggle('active', state.active === 'eraser'); eraser.onclick = () => { state.active = state.active === 'eraser' ? null : 'eraser'; renderControls(); };
+  const list = document.querySelector('#context-list');
+  list.innerHTML = state.contexts.map(item => `<span class="context-item"><button class="pill-button ${state.active === item.id ? 'active' : ''}" style="--dot:${color(item.hue, .62)};--soft:${color(item.hue, .93, .045)}" data-tool="${item.id}"><span>${item.emoji}</span><span class="dot"></span>${escapeHtml(item.title)}</button><button class="remove-button" title="Remove ${escapeHtml(item.title)}" data-remove="${item.id}">×</button></span>`).join('');
+  list.querySelectorAll('[data-tool]').forEach(button => button.onclick = () => { state.active = state.active === button.dataset.tool ? null : button.dataset.tool; state.mode = 'context'; renderControls(); });
+  list.querySelectorAll('[data-remove]').forEach(button => button.onclick = () => { const id = button.dataset.remove; state.contexts = state.contexts.filter(item => item.id !== id); Object.keys(state.painted).forEach(key => { if (state.painted[key] === id) delete state.painted[key]; }); if (state.active === id) state.active = null; render(); persist(); });
+  const eraser = document.querySelector('#eraser'); eraser.classList.toggle('active', state.active === 'eraser'); eraser.onclick = () => { state.active = state.active === 'eraser' ? null : 'eraser'; state.mode = 'context'; renderControls(); };
 }
 
 function renderCalendar() {
@@ -141,23 +159,26 @@ function renderCalendar() {
   const today = dateKey(new Date());
   for (let index = 0; index < state.weeks * 7; index++) {
     const date = new Date(state.startDate); date.setDate(date.getDate() + index);
-    const key = dateKey(date); const item = getHighlight(state.painted[key]);
+    const key = dateKey(date); const item = getContext(state.painted[key]);
     const previousDate = new Date(date); previousDate.setDate(previousDate.getDate() - 1);
-    const isHighlightStart = Boolean(item && state.painted[dateKey(previousDate)] !== item.id);
+    const isContextStart = Boolean(item && state.painted[dateKey(previousDate)] !== item.id);
     const isSelected = dragStart !== null && index >= Math.min(dragStart, dragEnd) && index <= Math.max(dragStart, dragEnd);
     const label = (date.getDate() === 1 || index === 0) ? MONTHS[date.getMonth()] : '';
-    const marker = isHighlightStart ? `<span class="highlight-band ${item.title.length > 14 ? 'wide' : ''}" style="--band-color:${color(item.hue, .62)}"><span>${highlightLabel(item.title)}</span></span><span class="highlight-emoji">${item.emoji}</span>` : '';
+    const marker = isContextStart ? `<span class="context-band ${item.title.length > 14 ? 'wide' : ''}" style="--band-color:${color(item.hue, .62)}"><span>${contextLabel(item.title)}</span></span><span class="context-emoji">${item.emoji}</span>` : '';
     const temperature = state.weather[state.weather.temperatureMode === 'low' ? 'lows' : 'highs'][key];
     const precipitation = state.weather.rain[key];
     const weatherStyle = typeof temperature === 'number' ? `--temp-color:${temperatureColor(temperature)}` : '';
     const weatherTitle = typeof temperature === 'number' ? ` title="Forecast ${state.weather.temperatureMode}: ${temperature} F"` : '';
     const rainEmoji = precipitation ? `<span class="weather-rain" title="${precipitation}% chance of precipitation">🌧️</span>` : '';
-    html += `<div class="day ${item ? 'highlighted' : ''} ${isSelected ? 'selected' : ''} ${typeof temperature === 'number' ? 'has-temperature' : ''}" data-index="${index}" style="--day-color:${item ? color(item.hue, .93, .045) : '#fff'};${weatherStyle}"${weatherTitle}>${marker}<div class="day-top"><span class="month-label">${label}</span><span class="date-weather">${rainEmoji}<span class="day-number ${key === today ? 'today' : ''}">${date.getDate()}</span></span></div><div class="day-note" contenteditable="true" data-note="${key}">${escapeHtml(state.notes[key] || '')}</div></div>`;
+    const tasks = tasksForDate(key);
+    const visibleTasks = tasks.slice(0, 5);
+    const taskMarkers = tasks.length ? `<div class="task-markers">${visibleTasks.map(task => `<button class="task-marker ${task.status === 'done' ? 'done' : ''}" data-task-id="${escapeHtml(task.id)}" style="--task-color:${taskColor(task)}" title="${escapeHtml(task.title)}">${taskIdLabel(task)}</button>`).join('')}${tasks.length > visibleTasks.length ? `<button class="task-overflow" data-date="${key}" title="View all ${tasks.length} tasks">+${tasks.length - visibleTasks.length}</button>` : ''}</div>` : '';
+    html += `<div class="day ${item ? 'contextual' : ''} ${isSelected ? 'selected' : ''} ${typeof temperature === 'number' ? 'has-temperature' : ''}" data-index="${index}" data-date="${key}" style="--day-color:${item ? color(item.hue, .93, .045) : '#fff'};${weatherStyle}"${weatherTitle}>${marker}<div class="day-top"><span class="month-label">${label}</span><span class="date-weather">${rainEmoji}<span class="day-number ${key === today ? 'today' : ''}">${date.getDate()}</span></span></div>${taskMarkers}</div>`;
   }
   calendar.innerHTML = html;
   const startPaint = (event, pointerId) => {
     const day = event.target.closest('.day');
-    if (!day || !state.active) return;
+    if (!day || state.mode !== 'context' || !state.active) return;
     event.preventDefault();
     dragStart = Number(day.dataset.index);
     dragEnd = dragStart;
@@ -180,7 +201,12 @@ function renderCalendar() {
     startPaint(event, event.pointerId);
     calendar.setPointerCapture?.(event.pointerId);
   };
-  calendar.querySelectorAll('.day-note').forEach(note => note.addEventListener('blur', () => { state.notes[note.dataset.note] = note.innerText; persist(); }));
+  calendar.querySelectorAll('.task-marker').forEach(marker => marker.onclick = event => { event.stopPropagation(); openTask(marker.dataset.taskId); });
+  calendar.querySelectorAll('.task-overflow').forEach(button => button.onclick = event => { event.stopPropagation(); openDate(button.dataset.date); });
+  calendar.querySelectorAll('.day').forEach(day => day.onclick = event => {
+    if ((state.mode === 'context' && state.active) || event.target.closest('.task-marker, .task-overflow')) return;
+    openDate(day.dataset.date);
+  });
 }
 function updateSelectionPreview() {
   document.querySelectorAll('.day').forEach(day => {
@@ -195,10 +221,10 @@ function eraseCell(index) {
   delete state.emojis[key];
   const day = document.querySelector(`.day[data-index="${index}"]`);
   if (day) {
-    day.classList.remove('highlighted');
+    day.classList.remove('contextual');
     day.style.setProperty('--day-color', '#fff');
-    day.querySelector('.highlight-band')?.remove();
-    day.querySelector('.highlight-emoji')?.remove();
+    day.querySelector('.context-band')?.remove();
+    day.querySelector('.context-emoji')?.remove();
   }
 }
 function movePaint(event) {
@@ -217,11 +243,11 @@ function movePaintTo(index) {
 function commitPaint(event) {
   if (event && event.pointerId !== dragPointerId) return;
   if (!dragging || dragStart === null || !state.active) { dragging = false; dragStart = dragEnd = dragPointerId = null; renderCalendar(); return; }
-  const highlight = getHighlight(state.active);
+  const context = getContext(state.active);
   for (let index = Math.min(dragStart, dragEnd); index <= Math.max(dragStart, dragEnd); index++) { const key = cellKey(index); if (state.active === 'eraser') eraseCell(index); else state.painted[key] = state.active; }
   const firstKey = cellKey(Math.min(dragStart, dragEnd));
   for (let index = Math.min(dragStart, dragEnd); index <= Math.max(dragStart, dragEnd); index++) delete state.emojis[cellKey(index)];
-  if (highlight) state.emojis[firstKey] = highlight.emoji;
+  if (context) state.emojis[firstKey] = context.emoji;
   dragging = false; dragStart = dragEnd = dragPointerId = null; render(); persist();
 }
 function cancelPaint(event) {
@@ -231,16 +257,71 @@ function cancelPaint(event) {
   renderCalendar();
 }
 function escapeHtml(value) { return String(value).replace(/[&<>'"]/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[character])); }
-function render() { renderControls(); renderWeather(); renderCalendar(); }
+function formatPanelDate(value) { return parseDate(value).toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }); }
+function nextPriority(date) { return Math.max(-1, ...tasksForDate(date).map(task => task.priorityOrder)) + 1; }
+function newTaskId() { return `T${String(Date.now()).slice(-6)}`; }
+function reorderTasks(date, movedId, targetId) {
+  const ordered = tasksForDate(date);
+  const from = ordered.findIndex(task => task.id === movedId);
+  const to = ordered.findIndex(task => task.id === targetId);
+  if (from < 0 || to < 0 || from === to) return;
+  const [moved] = ordered.splice(from, 1);
+  ordered.splice(from < to ? to - 1 : to, 0, moved);
+  ordered.forEach((task, index) => { task.priorityOrder = index; });
+  renderCalendar();
+  renderTaskPanel();
+  persist();
+}
+function openDate(date) { state.selectedDate = date; state.selectedTaskId = null; renderTaskPanel(); persist(); }
+function openTask(id) { const task = state.tasks.find(item => item.id === id); if (!task) return; state.selectedDate = task.date; state.selectedTaskId = id; renderTaskPanel(); persist(); }
+function closeTaskPanel() { state.selectedDate = null; state.selectedTaskId = null; renderTaskPanel(); persist(); }
+function renderTaskPanel() {
+  const panel = document.querySelector('#task-panel');
+  const content = document.querySelector('#task-panel-content');
+  const scrim = document.querySelector('#task-panel-scrim');
+  const isOpen = Boolean(state.selectedDate);
+  panel.classList.toggle('open', isOpen);
+  panel.setAttribute('aria-hidden', String(!isOpen));
+  scrim.hidden = !isOpen;
+  if (!isOpen) { content.innerHTML = ''; return; }
+  const task = state.tasks.find(item => item.id === state.selectedTaskId);
+  if (task) {
+    content.innerHTML = `<div class="panel-heading"><button class="back-button" id="back-to-date" aria-label="Back to date tasks">‹</button><p class="section-label">Task details</p><button class="close-panel" id="close-task-panel" aria-label="Close task panel">×</button></div><form id="task-form" class="task-form"><label>Title<input name="title" required value="${escapeHtml(task.title)}" /></label><label>Description<textarea name="description" rows="5">${escapeHtml(task.description)}</textarea></label><label>Date<input name="date" type="date" required value="${escapeHtml(task.date)}" /></label><label>Project<input name="project" value="${escapeHtml(task.project)}" placeholder="e.g. Home" /></label><label>Labels<input name="labels" value="${escapeHtml(task.labels.join(', '))}" placeholder="Comma separated" /></label><label>Priority order<input name="priorityOrder" type="number" step="1" value="${task.priorityOrder}" /></label><div class="task-form-actions"><button class="delete-task" type="button" id="delete-task">Delete</button><button class="status-task ${task.status === 'done' ? 'done' : ''}" type="button" id="toggle-task-status">${task.status === 'done' ? 'Re-open' : 'Complete'}</button><button class="add-button" type="submit">Save task</button></div></form>`;
+    document.querySelector('#back-to-date').onclick = () => openDate(task.date);
+    document.querySelector('#delete-task').onclick = () => { state.tasks = state.tasks.filter(item => item.id !== task.id); openDate(task.date); render(); persist(); };
+    document.querySelector('#toggle-task-status').onclick = () => { task.status = task.status === 'done' ? 'todo' : 'done'; state.selectedTaskId = null; render(); persist(); };
+    document.querySelector('#task-form').onsubmit = event => {
+      event.preventDefault(); const form = new FormData(event.currentTarget); const date = String(form.get('date') || ''); if (!date) return;
+      Object.assign(task, { title: String(form.get('title')).trim(), description: String(form.get('description')).trim(), date, project: String(form.get('project')).trim(), labels: String(form.get('labels')).split(',').map(label => label.trim()).filter(Boolean), priorityOrder: Number(form.get('priorityOrder')) || 0 });
+      state.selectedDate = task.date; state.selectedTaskId = null; render(); persist();
+    };
+  } else {
+    const tasks = tasksForDate(state.selectedDate);
+    content.innerHTML = `<div class="panel-heading"><div><p class="section-label">Tasks on</p><h2>${formatPanelDate(state.selectedDate)}</h2></div><button class="close-panel" id="close-task-panel" aria-label="Close task panel">×</button></div><div class="date-task-list">${tasks.length ? tasks.map(task => `<button class="task-list-item ${task.status === 'done' ? 'done' : ''}" data-task-id="${escapeHtml(task.id)}" draggable="true"><span class="task-list-dot" style="--task-color:${taskColor(task)}"></span><span><strong>${escapeHtml(task.title)}</strong><small>${escapeHtml(task.project || 'No project')} · ${escapeHtml(task.id)}</small></span></button>`).join('') : '<p class="empty-tasks">No tasks scheduled for this date.</p>'}</div><button id="new-task" class="new-task-button">Add task</button>`;
+    document.querySelectorAll('.task-list-item').forEach(button => button.onclick = () => openTask(button.dataset.taskId));
+    document.querySelectorAll('.task-list-item').forEach(button => {
+      button.ondragstart = event => { event.dataTransfer.effectAllowed = 'move'; event.dataTransfer.setData('text/plain', button.dataset.taskId); button.classList.add('dragging'); };
+      button.ondragend = () => document.querySelectorAll('.task-list-item').forEach(item => item.classList.remove('dragging', 'drag-over'));
+      button.ondragover = event => { event.preventDefault(); event.dataTransfer.dropEffect = 'move'; button.classList.add('drag-over'); };
+      button.ondragleave = () => button.classList.remove('drag-over');
+      button.ondrop = event => { event.preventDefault(); reorderTasks(state.selectedDate, event.dataTransfer.getData('text/plain'), button.dataset.taskId); };
+    });
+    document.querySelector('#new-task').onclick = () => { const task = { id: newTaskId(), title: 'Untitled task', description: '', date: state.selectedDate, labels: [], project: '', priorityOrder: nextPriority(state.selectedDate), status: 'todo' }; state.tasks.push(task); openTask(task.id); render(); persist(); document.querySelector('#task-form [name="title"]')?.select(); };
+  }
+  document.querySelector('#close-task-panel').onclick = closeTaskPanel;
+}
+function render() { renderControls(); renderWeather(); renderCalendar(); renderTaskPanel(); }
 
 document.querySelector('#previous-week').onclick = () => changeStart(-7);
 document.querySelector('#next-week').onclick = () => changeStart(7);
+document.querySelector('#task-mode').onclick = () => { state.mode = 'task'; renderControls(); persist(); };
+document.querySelector('#context-mode').onclick = () => { state.mode = 'context'; renderControls(); persist(); };
 document.querySelector('#decrease-weeks').onclick = () => setWeeks(state.weeks - 1);
 document.querySelector('#increase-weeks').onclick = () => setWeeks(state.weeks + 1);
 document.querySelector('#start-date').onchange = event => { if (event.target.value) { state.startDate = sundayOf(parseDate(event.target.value)); render(); persist(); } };
 document.querySelector('#weather-form').onsubmit = event => { event.preventDefault(); loadWeather(document.querySelector('#weather-zip').value); };
 document.querySelectorAll('[data-temperature-mode]').forEach(button => button.onclick = () => { state.weather.temperatureMode = button.dataset.temperatureMode; render(); persist(); });
-document.querySelector('#new-highlight').onsubmit = event => { event.preventDefault(); const title = document.querySelector('#title-input').value.trim(); if (!title) return; const id = `highlight-${Date.now()}`; state.highlights.push({ id, title, emoji: document.querySelector('#emoji-input').value.trim() || '📌', hue: state.draftHue }); state.active = id; document.querySelector('#title-input').value = ''; state.draftHue = HUES[(HUES.indexOf(state.draftHue) + 1) % HUES.length]; render(); persist(); };
+document.querySelector('#new-context').onsubmit = event => { event.preventDefault(); const title = document.querySelector('#title-input').value.trim(); if (!title) return; const id = `context-${Date.now()}`; state.contexts.push({ id, title, emoji: document.querySelector('#emoji-input').value.trim() || '📌', hue: state.draftHue }); state.active = id; document.querySelector('#title-input').value = ''; state.draftHue = HUES[(HUES.indexOf(state.draftHue) + 1) % HUES.length]; render(); persist(); };
 const emojiTrigger = document.querySelector('#emoji-trigger');
 const emojiPicker = document.querySelector('#emoji-picker');
 emojiTrigger.onclick = () => emojiPicker.classList.toggle('open');
@@ -250,4 +331,5 @@ document.addEventListener('pointermove', movePaint);
 document.addEventListener('pointerup', commitPaint);
 document.addEventListener('pointercancel', cancelPaint);
 document.addEventListener('mouseup', () => { if (dragPointerId === 'mouse') commitPaint(); });
+document.querySelector('#task-panel-scrim').onclick = closeTaskPanel;
 render();
