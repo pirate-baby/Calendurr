@@ -14,8 +14,6 @@ _(pronounced Calen-durr)_
 
 So this interface solves the things I hate about calendar planning. 
 
-![image of app](assets/calendurr.png)
-
 ## Is This A TODO App? A Calendar App? 
 nope, Calendurr is a skin. I have no interest in building any of those things, there are a gazillion out there. This is just a better way to interface with the data those things create/operate with. Pick your favorite todo/task/calendar thing and point an agent at it, add an adapter, and you are set to go. 
 
