@@ -14,58 +14,65 @@
       </div>
     </header>
 
-    <section class="toolbar panel" aria-label="Calendar controls">
-      <div class="date-controls control-group">
-        <button class="icon-button" id="previous-week" aria-label="Previous week">‹</button>
-        <input id="start-date" type="date" aria-label="Calendar start date" />
-        <button class="icon-button" id="next-week" aria-label="Next week">›</button>
-      </div>
-      <span class="separator"></span>
-      <div class="week-controls control-group">
-        <span class="control-label">Show</span>
-        <button class="small-button" id="decrease-weeks" aria-label="Show fewer weeks">−</button>
-        <strong id="weeks-label">6 weeks</strong>
-        <button class="small-button" id="increase-weeks" aria-label="Show more weeks">+</button>
-      </div>
-      <div class="presets" id="presets" aria-label="Week presets"></div>
-    </section>
+    <details class="collapsible-section panel">
+      <summary>Calendar controls</summary>
+      <section class="toolbar" aria-label="Calendar controls">
+        <div class="date-controls control-group">
+          <button class="icon-button" id="previous-week" aria-label="Previous week">‹</button>
+          <input id="start-date" type="date" aria-label="Calendar start date" />
+          <button class="icon-button" id="next-week" aria-label="Next week">›</button>
+        </div>
+        <span class="separator"></span>
+        <div class="week-controls control-group">
+          <span class="control-label">Show</span>
+          <button class="small-button" id="decrease-weeks" aria-label="Show fewer weeks">−</button>
+          <strong id="weeks-label">6 weeks</strong>
+          <button class="small-button" id="increase-weeks" aria-label="Show more weeks">+</button>
+        </div>
+        <div class="presets" id="presets" aria-label="Week presets"></div>
+      </section>
+    </details>
 
-    <section class="weather-panel panel" aria-label="NOAA weather forecast">
-      <div class="weather-heading">
-        <div>
-          <p class="section-label">NOAA Forecast</p>
-          <p id="weather-status" class="weather-status" aria-live="polite">Enter a US ZIP code to color days by forecast high.</p>
-          <div class="temperature-mode" aria-label="Calendar temperature band">
-            <button type="button" data-temperature-mode="high">Highs</button>
-            <button type="button" data-temperature-mode="low">Lows</button>
+    <details class="collapsible-section panel">
+      <summary>Forecast</summary>
+      <section class="weather-panel" aria-label="NOAA weather forecast">
+        <div class="weather-heading">
+          <div>
+            <p id="weather-status" class="weather-status" aria-live="polite">Enter a US ZIP code to color days by forecast high.</p>
+            <div class="temperature-mode" aria-label="Calendar temperature band">
+              <button type="button" data-temperature-mode="high">Highs</button>
+              <button type="button" data-temperature-mode="low">Lows</button>
+            </div>
           </div>
+          <form id="weather-form" class="weather-form">
+            <label for="weather-zip">ZIP code</label>
+            <input id="weather-zip" inputmode="numeric" autocomplete="postal-code" maxlength="5" pattern="[0-9]{5}" placeholder="02139" aria-label="US ZIP code" />
+            <button class="weather-button" type="submit">Load weather</button>
+          </form>
         </div>
-        <form id="weather-form" class="weather-form">
-          <label for="weather-zip">ZIP code</label>
-          <input id="weather-zip" inputmode="numeric" autocomplete="postal-code" maxlength="5" pattern="[0-9]{5}" placeholder="02139" aria-label="US ZIP code" />
-          <button class="weather-button" type="submit">Load weather</button>
-        </form>
-      </div>
-      <div id="temperature-scale" class="temperature-scale" aria-label="Temperature color scale"></div>
-    </section>
+        <div id="temperature-scale" class="temperature-scale" aria-label="Temperature color scale"></div>
+      </section>
+    </details>
 
-    <section class="panel contexts-panel">
-      <span class="section-label">Contexts</span>
-      <div class="context-row">
-        <div id="context-list" class="context-list"></div>
-        <button id="eraser" class="pill-button">Eraser</button>
-      </div>
-      <form id="new-context" class="new-context">
-        <div class="emoji-picker-wrap">
-          <button id="emoji-trigger" class="emoji-trigger" type="button" aria-label="Choose an emoji">🎯</button>
-          <emoji-picker id="emoji-picker"></emoji-picker>
-          <input id="emoji-input" type="hidden" value="🎯" />
+    <details class="collapsible-section panel">
+      <summary>Contexts</summary>
+      <section class="contexts-panel">
+        <div class="context-row">
+          <div id="context-list" class="context-list"></div>
+          <button id="eraser" class="pill-button">Eraser</button>
         </div>
-        <input id="title-input" class="title-input" placeholder="Context, e.g. Grandma in town" aria-label="Context name" />
-        <div id="swatches" class="swatches" aria-label="Context color"></div>
-        <button class="add-button" type="submit">Add</button>
-      </form>
-    </section>
+        <form id="new-context" class="new-context">
+          <div class="emoji-picker-wrap">
+            <button id="emoji-trigger" class="emoji-trigger" type="button" aria-label="Choose an emoji">🎯</button>
+            <emoji-picker id="emoji-picker"></emoji-picker>
+            <input id="emoji-input" type="hidden" value="🎯" />
+          </div>
+          <input id="title-input" class="title-input" placeholder="Context, e.g. Grandma in town" aria-label="Context name" />
+          <div id="swatches" class="swatches" aria-label="Context color"></div>
+          <button class="add-button" type="submit">Add</button>
+        </form>
+      </section>
+    </details>
 
     <div class="calendar-heading">
       <div class="mode-controls" aria-label="Calendar mode">
