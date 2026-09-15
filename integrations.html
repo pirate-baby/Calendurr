@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Integrations · Calendurr</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <main class="page-shell">
+    <header class="page-header">
+      <div><h1>Integrations</h1></div>
+      <details class="nav-menu">
+        <summary title="Menu" aria-label="Open menu">☰</summary>
+        <nav aria-label="Main navigation">
+          <a href="index.html">Calendar</a>
+          <a class="active" href="integrations.html">Integrations</a>
+        </nav>
+      </details>
+    </header>
+
+    <section class="integration-card panel">
+      <div class="integration-heading">
+        <div>
+          <p class="section-label">Local integration</p>
+          <h2>TaskWarrior</h2>
+        </div>
+        <span id="taskwarrior-status" class="integration-status">Checking connection</span>
+      </div>
+      <p>Calendurr talks to the TaskWarrior command-line client on this server. Configure TaskWarrior sync normally and it will continue to synchronize with Taskserver.</p>
+      <dl class="integration-details">
+        <div><dt>Server</dt><dd>This Calendurr host</dd></div>
+        <div><dt>Authentication</dt><dd>TaskWarrior configuration on the host</dd></div>
+        <div><dt>Browser access</dt><dd>Same-origin API only</dd></div>
+      </dl>
+    </section>
+  </main>
+  <script src="integrations.js"></script>
+</body>
+</html>

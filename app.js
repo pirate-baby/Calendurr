@@ -42,6 +42,7 @@ let dragStart = null;
 let dragEnd = null;
 let dragging = false;
 let dragPointerId = null;
+let taskApiAvailable = false;
 
 function persist() {
   try {
@@ -57,6 +58,32 @@ function getContext(id) { return state.contexts.find(item => item.id === id); }
 function tasksForDate(date) { return state.tasks.filter(task => task.date === date).sort((a, b) => a.priorityOrder - b.priorityOrder || a.title.localeCompare(b.title)); }
 function taskColor(task) { return task.project ? color(projectHue(task.project), .62, .13) : '#938b84'; }
 function taskIdLabel(task) { return escapeHtml(task.id.length > 5 ? task.id.slice(-5) : task.id); }
+async function taskApi(path = '', options = {}) {
+  const response = await fetch(`/api/tasks${path}`, {
+    ...options,
+    headers: { 'Content-Type': 'application/json', ...(options.headers || {}) }
+  });
+  if (!response.ok) {
+    const body = await response.json().catch(() => ({}));
+    throw new Error(body.error || 'Unable to update TaskWarrior.');
+  }
+  return response.json();
+}
+async function loadTaskwarriorTasks() {
+  try {
+    state.tasks = await taskApi();
+    taskApiAvailable = true;
+    render();
+  } catch {
+    // Opening index.html directly keeps the existing browser-only task cache available.
+  }
+}
+async function saveTaskToApi(task) {
+  if (!taskApiAvailable) return task;
+  const savedTask = await taskApi(`/${encodeURIComponent(task.id)}`, { method: 'PUT', body: JSON.stringify(task) });
+  Object.assign(task, savedTask);
+  return task;
+}
 function contextLabel(title) {
   if (title.length <= 14) return escapeHtml(title);
   const middle = Math.ceil(title.length / 2);
@@ -260,7 +287,7 @@ function escapeHtml(value) { return String(value).replace(/[&<>'"]/g, character 
 function formatPanelDate(value) { return parseDate(value).toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }); }
 function nextPriority(date) { return Math.max(-1, ...tasksForDate(date).map(task => task.priorityOrder)) + 1; }
 function newTaskId() { return `T${String(Date.now()).slice(-6)}`; }
-function reorderTasks(date, movedId, targetId) {
+async function reorderTasks(date, movedId, targetId) {
   const ordered = tasksForDate(date);
   const from = ordered.findIndex(task => task.id === movedId);
   const to = ordered.findIndex(task => task.id === targetId);
@@ -268,9 +295,12 @@ function reorderTasks(date, movedId, targetId) {
   const [moved] = ordered.splice(from, 1);
   ordered.splice(from < to ? to - 1 : to, 0, moved);
   ordered.forEach((task, index) => { task.priorityOrder = index; });
-  renderCalendar();
-  renderTaskPanel();
-  persist();
+  try {
+    if (taskApiAvailable) state.tasks = await taskApi('/reorder', { method: 'POST', body: JSON.stringify({ tasks: ordered.map(task => ({ id: task.id, priorityOrder: task.priorityOrder })) }) });
+    renderCalendar();
+    renderTaskPanel();
+    persist();
+  } catch (error) { window.alert(error.message); }
 }
 function openDate(date) { state.selectedDate = date; state.selectedTaskId = null; renderTaskPanel(); persist(); }
 function openTask(id) { const task = state.tasks.find(item => item.id === id); if (!task) return; state.selectedDate = task.date; state.selectedTaskId = id; renderTaskPanel(); persist(); }
@@ -288,12 +318,26 @@ function renderTaskPanel() {
   if (task) {
     content.innerHTML = `<div class="panel-heading"><button class="back-button" id="back-to-date" aria-label="Back to date tasks">‹</button><p class="section-label">Task details</p><button class="close-panel" id="close-task-panel" aria-label="Close task panel">×</button></div><form id="task-form" class="task-form"><label>Title<input name="title" required value="${escapeHtml(task.title)}" /></label><label>Description<textarea name="description" rows="5">${escapeHtml(task.description)}</textarea></label><label>Date<input name="date" type="date" required value="${escapeHtml(task.date)}" /></label><label>Project<input name="project" value="${escapeHtml(task.project)}" placeholder="e.g. Home" /></label><label>Labels<input name="labels" value="${escapeHtml(task.labels.join(', '))}" placeholder="Comma separated" /></label><label>Priority order<input name="priorityOrder" type="number" step="1" value="${task.priorityOrder}" /></label><div class="task-form-actions"><button class="delete-task" type="button" id="delete-task">Delete</button><button class="status-task ${task.status === 'done' ? 'done' : ''}" type="button" id="toggle-task-status">${task.status === 'done' ? 'Re-open' : 'Complete'}</button><button class="add-button" type="submit">Save task</button></div></form>`;
     document.querySelector('#back-to-date').onclick = () => openDate(task.date);
-    document.querySelector('#delete-task').onclick = () => { state.tasks = state.tasks.filter(item => item.id !== task.id); openDate(task.date); render(); persist(); };
-    document.querySelector('#toggle-task-status').onclick = () => { task.status = task.status === 'done' ? 'todo' : 'done'; state.selectedTaskId = null; render(); persist(); };
-    document.querySelector('#task-form').onsubmit = event => {
+    document.querySelector('#delete-task').onclick = async () => {
+      try {
+        if (taskApiAvailable) await taskApi(`/${encodeURIComponent(task.id)}`, { method: 'DELETE' });
+        state.tasks = state.tasks.filter(item => item.id !== task.id); openDate(task.date); render(); persist();
+      } catch (error) { window.alert(error.message); }
+    };
+    document.querySelector('#toggle-task-status').onclick = async () => {
+      try {
+        task.status = task.status === 'done' ? 'todo' : 'done';
+        await saveTaskToApi(task);
+        state.selectedTaskId = null; render(); persist();
+      } catch (error) { window.alert(error.message); }
+    };
+    document.querySelector('#task-form').onsubmit = async event => {
       event.preventDefault(); const form = new FormData(event.currentTarget); const date = String(form.get('date') || ''); if (!date) return;
       Object.assign(task, { title: String(form.get('title')).trim(), description: String(form.get('description')).trim(), date, project: String(form.get('project')).trim(), labels: String(form.get('labels')).split(',').map(label => label.trim()).filter(Boolean), priorityOrder: Number(form.get('priorityOrder')) || 0 });
-      state.selectedDate = task.date; state.selectedTaskId = null; render(); persist();
+      try {
+        await saveTaskToApi(task);
+        state.selectedDate = task.date; state.selectedTaskId = null; render(); persist();
+      } catch (error) { window.alert(error.message); }
     };
   } else {
     const tasks = tasksForDate(state.selectedDate);
@@ -306,7 +350,13 @@ function renderTaskPanel() {
       button.ondragleave = () => button.classList.remove('drag-over');
       button.ondrop = event => { event.preventDefault(); reorderTasks(state.selectedDate, event.dataTransfer.getData('text/plain'), button.dataset.taskId); };
     });
-    document.querySelector('#new-task').onclick = () => { const task = { id: newTaskId(), title: 'Untitled task', description: '', date: state.selectedDate, labels: [], project: '', priorityOrder: nextPriority(state.selectedDate), status: 'todo' }; state.tasks.push(task); openTask(task.id); render(); persist(); document.querySelector('#task-form [name="title"]')?.select(); };
+    document.querySelector('#new-task').onclick = async () => {
+      let task = { id: newTaskId(), title: 'Untitled task', description: '', date: state.selectedDate, labels: [], project: '', priorityOrder: nextPriority(state.selectedDate), status: 'todo' };
+      try {
+        if (taskApiAvailable) task = await taskApi('', { method: 'POST', body: JSON.stringify(task) });
+        state.tasks.push(task); openTask(task.id); render(); persist(); document.querySelector('#task-form [name="title"]')?.select();
+      } catch (error) { window.alert(error.message); }
+    };
   }
   document.querySelector('#close-task-panel').onclick = closeTaskPanel;
 }
@@ -333,3 +383,4 @@ document.addEventListener('pointercancel', cancelPaint);
 document.addEventListener('mouseup', () => { if (dragPointerId === 'mouse') commitPaint(); });
 document.querySelector('#task-panel-scrim').onclick = closeTaskPanel;
 render();
+loadTaskwarriorTasks();

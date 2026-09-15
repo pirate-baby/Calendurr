@@ -14,7 +14,19 @@ So this interface solves the things I hate about calendar planning.
 
 ![image of app](assets/calendurr.png)
 
-At the moment it has no integrations and is browser storage.
+## Running With TaskWarrior
+
+Calendurr is a web UI backed by the local TaskWarrior client. Start it on the machine that has TaskWarrior configured:
+
+```sh
+python3 server.py
+```
+
+Then open `http://127.0.0.1:8787`. The Python server serves the UI and translates its generic task model to TaskWarrior commands. TaskWarrior remains responsible for syncing with Taskserver, including its server, credentials, and certificates.
+
+The server binds to localhost deliberately. For remote access, put it behind an authenticated HTTPS reverse proxy rather than exposing the TaskWarrior API directly.
+
+The integration defines two TaskWarrior UDAs, `calendurr_description` and `calendurr_priority_order`, to preserve Calendurr's task description and within-day ordering.
 
 ### Task Model
 
