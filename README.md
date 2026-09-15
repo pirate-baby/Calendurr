@@ -3,12 +3,14 @@ _(pronounced Calen-durr)_
 
 **Calendar interfaces suck. All of them.** 
 - Life doesn't work in monthly blocks, but that's all calendars can do - so you end up opening up each month and tab-toggling. Gross.
+  Calendurr uses weeks ahead of/before Today, the way we actually do stuff.
 - Things tend to happen over ranges and then inside those ranges: 
     - "Grandma is visiting" goes from Monday until Friday
-    - "take Grandma to get cheesesteaks" happens on Tuesday while she is visiting
-      
+    - "take Grandma to get cheesesteaks" happens on Tuesday while she is visiting     
   These shouldn't be events that conflict - one thing is an event, the other is context. 
-  Some apps can _sorta_ show this, but not well. 
+  Some apps can _sorta_ show this, but not well.
+- Todo things tend to pile up at once, so Calendurr makes it easy to show a LOT of items on a single day. 
+
 
 So this interface solves the things I hate about calendar planning. 
 
