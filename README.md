@@ -11,6 +11,10 @@ _(pronounced Calen-durr)_
   Some apps can _sorta_ show this, but not well.
 - Todo things tend to pile up at once, so Calendurr makes it easy to show a LOT of items on a single day. 
 
+<figure>
+  <img src="assets/main.png"/>
+  <figcaption>One view spanning many months, showing temp and weather as color bars, displaying contexts outside events.</figcaption>
+</figure>
 
 So this interface solves the things I hate about calendar planning. 
 
