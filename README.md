@@ -6,6 +6,7 @@ _(pronounced Calen-durr)_
 - Things tend to happen over ranges and then inside those ranges: 
     - "Grandma is visiting" goes from Monday until Friday
     - "take Grandma to get cheesesteaks" happens on Tuesday while she is visiting
+      
   These shouldn't be events that conflict - one thing is an event, the other is context. 
   Some apps can _sorta_ show this, but not well. 
 
