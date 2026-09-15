@@ -14,9 +14,12 @@ So this interface solves the things I hate about calendar planning.
 
 ![image of app](assets/calendurr.png)
 
-## Running With TaskWarrior
+## Is This A TODO App? A Calendar App? 
+nope, Calendurr is a skin. I have no interest in building any of those things, there are a gazillion out there. This is just a better way to interface with the data those things create/operate with. Pick your favorite todo/task/calendar thing and point an agent at it, add an adapter, and you are set to go. 
 
-Calendurr is a web UI backed by the local TaskWarrior client. Start it on the machine that has TaskWarrior configured:
+## Example: Running With TaskWarrior
+
+Calendurr is a just a non-crappy web UI, all client side with no backend. You can stick it on whatever you use for tasks, with a little adapting. To test this claim, I've set up a by the local TaskWarrior adapter, so you can use that if you want. Start it on the machine that has TaskWarrior configured:
 
 ```sh
 python3 server.py
@@ -46,9 +49,6 @@ Tasks use a deliberately small, tool-agnostic shape and must have a date:
 ```
 
 `id` is an opaque identifier. `priorityOrder` sorts tasks that share a date. A task with `status: 'done'` is complete; all other values are treated as open. Tasks without a `date` are not stored or displayed.
-
-## OK So What Will You Do With It? 
-I am thinking of extending this as a view around TaskWarrior so you can see and manipulate tasks in a calendar-first interface. Or make the interface tool agnostic with adapters for each tool you might want to use (or more than one). 
 
 ## What's Up With The Weather
 Lots of things in life depend on the weather, yet another thing that is difficult to get visually on most calendar apps. In this case it is baked in.
