@@ -11,12 +11,24 @@ _(pronounced Calen-durr)_
   Some apps can _sorta_ show this, but not well.
 - Todo things tend to pile up at once, so Calendurr makes it easy to show a LOT of items on a single day. 
 
+
+So this interface solves the things I hate about calendar planning. 
+
 <figure>
   <img src="assets/main.png"/>
   <figcaption>One view spanning many months, showing temp and weather as color bars, displaying contexts outside events.</figcaption>
 </figure>
 
-So this interface solves the things I hate about calendar planning. 
+<figure>
+  <img src="assets/task.png"/>
+  <figcaption>Pretty generic task fields that should play nice with almost any todo/calendar/project management data model you've got.</figcaption>
+</figure>
+
+
+<figure>
+  <img src="assets/task list.png"/>
+  <figcaption>You can fit a lot of tasks into a day when they are little bubbles.</figcaption>
+</figure>
 
 ## Is This A TODO App? A Calendar App? 
 nope, Calendurr is a skin. I have no interest in building any of those things, there are a gazillion out there. This is just a better way to interface with the data those things create/operate with. Pick your favorite todo/task/calendar thing and point an agent at it, add an adapter, and you are set to go. 
